@@ -1,32 +1,22 @@
 package com.michaelxie.fillthescreen;
 
-import com.michaelxie.fillthescreen.util.SystemUiHider;
-
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Point;
-import android.graphics.Rect;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.AttributeSet;
-import android.view.Display;
-import android.view.GestureDetector;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.Window;
 import android.view.WindowManager;
 
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.Random;
 import java.util.concurrent.Semaphore;
 
 import static java.lang.Math.*;
@@ -43,16 +33,6 @@ public class GameScreen extends Activity {
         setContentView(gameSurface);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-        /*gameSurface.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View view, MotionEvent e) {
-                Circle c = new Circle(e.getX(), e.getY(), 100);
-                System.out.println("NEW CIRCLE (" + e.getX() + "," + e.getY() + ")");
-                gameSurface.addCircle(c);
-                return false;
-            }
-        });*/
     }
 
     @Override
@@ -127,7 +107,7 @@ public class GameScreen extends Activity {
                 e.printStackTrace();
             }
 
-            if(!isTouching(c, circles, false)) {
+            if(isTouching(c, circles, false) == -1) {
                 activeCircles.add(c);
             }
             arrayLock.release();
@@ -188,6 +168,7 @@ public class GameScreen extends Activity {
                 }
             }
         }
+
         private void drawBackground(Canvas canvas) {
             canvas.drawColor(Color.parseColor("#0099cc"));
         }
@@ -230,6 +211,14 @@ public class GameScreen extends Activity {
             return sidesCrossed;
         }
 
+        private float magnitudeFromLegs(float x, float y) {
+            return (float)Math.sqrt(x*x + y*y);
+        }
+
+        private float legFromHypotenuse(double hypotenuse, double leg){
+            return (float)Math.sqrt(hypotenuse * hypotenuse - leg * leg);
+        }
+
         private float computeArea(Circle c) {
             double radius = c.getRadius();
             float x = c.getX();
@@ -249,7 +238,7 @@ public class GameScreen extends Activity {
                 double distanceToSide = computeDistToSide(sideIndex, radius, x, y);
                 double triangleAlpha = Math.acos(distanceToSide / radius);
                 double sectorTheta = 2 * PI - 2 * triangleAlpha;
-                float triangleBase = (float)Math.sqrt(radius * radius - distanceToSide * distanceToSide);
+                float triangleBase = legFromHypotenuse(radius, distanceToSide);
                 return (float)((sectorTheta / 2) * (radius * radius) + 2 * triangleBase * distanceToSide);
 
             } else if (sidesCrossed.cardinality() == 2) {
@@ -267,8 +256,8 @@ public class GameScreen extends Activity {
                     double alpha = Math.acos(distanceTo1/radius);
                     double beta = Math.acos(distanceTo2/radius);
                     double sectorTheta = 2 * Math.PI - 2 * alpha - 2 * beta;
-                    float alphaTriangleBase = (float)Math.sqrt(radius * radius - distanceTo1 * distanceTo1);
-                    float betaTriangleBase = (float)Math.sqrt(radius * radius - distanceTo2 * distanceTo2);
+                    float alphaTriangleBase = legFromHypotenuse(radius, distanceTo1);
+                    float betaTriangleBase = legFromHypotenuse(radius, distanceTo2);
                     float sectorArea = (float)((sectorTheta / 2) * (radius * radius));
                     return (float)(sectorArea + alphaTriangleBase * distanceTo1 + betaTriangleBase * distanceTo2);
                 }
@@ -289,8 +278,8 @@ public class GameScreen extends Activity {
                 float sectorArea = (float)((sectorTheta / 2) * (radius * radius));
                 float rectArea = (float)(distanceToX * distanceToY);
 
-                float xTriangleBase = (float)Math.sqrt(radius * radius - distanceToX * distanceToX);
-                float yTriangleBase = (float)Math.sqrt(radius * radius - distanceToY * distanceToY);
+                float xTriangleBase = legFromHypotenuse(radius, distanceToX);
+                float yTriangleBase = legFromHypotenuse(radius, distanceToY);
 
                 return (float)(sectorArea + rectArea + 0.5 * xTriangleBase * distanceToX + 0.5 * yTriangleBase * distanceToY);
             } else if (sidesCrossed.cardinality() == 3) {
@@ -312,8 +301,8 @@ public class GameScreen extends Activity {
                 double triangle1Alpha = Math.acos(distanceToDoubleCrossed1 / radius);
                 double triangle2Beta = Math.acos(distanceToDoubleCrossed2 / radius);
                 double sectorTheta = Math.PI - triangle1Alpha - triangle2Beta;
-                float triangle1Base = (float)Math.sqrt(radius * radius - distanceToDoubleCrossed1 * distanceToDoubleCrossed1);
-                float triangle2Base = (float)Math.sqrt(radius * radius - distanceToDoubleCrossed2 * distanceToDoubleCrossed2);
+                float triangle1Base = legFromHypotenuse(radius, distanceToDoubleCrossed1);
+                float triangle2Base = legFromHypotenuse(radius, distanceToDoubleCrossed2);
                 return (float)((sectorTheta / 2) * (radius * radius)
                         + 0.5 * triangle1Base * distanceToDoubleCrossed1 + 0.5 * triangle2Base * distanceToDoubleCrossed2
                         + (distanceToDoubleCrossed1 + distanceToDoubleCrossed2) * distanceToSingleCrossed);
@@ -335,7 +324,7 @@ public class GameScreen extends Activity {
 
 
         //Two different possible policies here - do I stop on border or not?
-        private boolean isTouching(Circle c, ArrayList<Circle> circleArray, boolean removeOnHit) {
+        private int isTouching(Circle c, ArrayList<Circle> circleArray, boolean removeOnHit) {
             /*double radius = c.getRadius();
             float x = c.getX();
             float y = c.getY();
@@ -346,7 +335,7 @@ public class GameScreen extends Activity {
             if(x + radius > width) sidesCrossed.flip(1); //0100
             if(y - radius < 0) sidesCrossed.flip(2); //0010
             if(y + radius > height) sidesCrossed.flip(3); //0001
-            
+
             float threshold = 10;
             int sideIndex = 0;
             boolean crossedSide = false;
@@ -355,27 +344,26 @@ public class GameScreen extends Activity {
                 if (sideOverlap > 0 && sideOverlap < threshold) { //close to a side, let them reach the side
                             return true;
                 } else if (sideOverlap < )
-                
+
             }*/
-          
+
             for(int i = 0; i < circleArray.size(); i++) {
                 float distance = computeDistance(c, circleArray.get(i));
                 if(distance <= (c.getRadius() + circleArray.get(i).getRadius())) {
                     if(removeOnHit) circleArray.remove(i);
-                    return true;
+                    return i;
                 }
             }
-            return false;
+            return -1;
         }
 
         private void drawCircles(Canvas canvas) {
 
             for(int i = 0; i < activeCircles.size(); i++) {
                 Circle c = activeCircles.get(i);
-                if(!isTouching(c, circles, false)) {
+                if(isTouching(c, circles, false) == -1) {
                     canvas.drawCircle(c.getX(), c.getY(), c.getRadiusAndInc(), paint);
                 } else {
-                    //computeArea();
                     incrementArea(activeCircles);
                     circles.addAll(activeCircles);
                     activeCircles.clear();
@@ -389,10 +377,35 @@ public class GameScreen extends Activity {
 
         }
 
+        private float angleBetweenVecs(float x1, float y1, float x2, float y2, float mag1, float mag2) {
+            return (float)Math.acos((x1 * x2 + y1 * y2) / (mag1 * mag2));
+        }
 
+        private void handleCircleBounce(Ball b, Circle c) {
+
+            //For option of moving the user's circles as well
+            //b.vx = (b.vx * (b.getMass() – c.getMass()) + (2 * c.getMass() * c.vx)) / (firstBall.mass + secondBall.mass);
+            //b.vy = (b.vy * (b.getMass() – c.getMass()) + (2 * c.getMass() * secondBall.speed.y)) / (firstBall.mass + secondBall.mass);
+
+
+
+            //Calculate components of vector from the two circles' origins
+            float dx = c.getX() - b.getX();
+            float dy = c.getY() - b.getY();
+
+            float nn = dx * dx + dy * dy;
+            float vn = dx * b.vx + dy * b.vy;
+
+            //if(vn > 0.0f) return; This commented code captures balls in a gravity field like manner
+            b.vx -= (2.0f * (vn/nn)) * dx;
+            b.vy -= (2.0f * (vn/nn)) * dy;
+
+    }
 
         private void drawBalls(Canvas canvas) {
+
             for(Ball b : balls) {
+                int touchingCircleIndex;
                 //bounce logic
                 BitSet sidesCrossed = getSidesCrossed(b);
                 //touching screen border, a circle, or active circle
@@ -406,8 +419,12 @@ public class GameScreen extends Activity {
                             case 3: b.vy *= -1; break;
                         }
                     }
-                } else if( isTouching(b, activeCircles, true) || isTouching(b, circles, false)) {
+                } else if(isTouching(b, activeCircles, true) != -1) {
+                    //remove from active circles, ball hit a growing circle. Handled by isTouching
 
+                } else if((touchingCircleIndex = isTouching(b, circles, false)) != -1) {
+                    //Add circle bounce code
+                    handleCircleBounce(b, circles.get(touchingCircleIndex));
                 }
                 canvas.drawCircle(b.updateX(), b.updateY(), b.getRadius(), contrastPaint);
             }
@@ -494,26 +511,30 @@ class Circle {
     float x;
     float y;
     float radius;
+    float vx, vy;
     public Circle() {}
     public Circle(float x, float y, float radius) {
         this.x = x;
         this.y = y;
         this.radius = radius;
+        vx = 0;
+        vy = 0;
     }
     float getX() { return x; }
     float getY() { return y; }
     float getRadiusAndInc() { return radius += 1.0; } //Increment radius every time it is accessed, which means it's still active
     float getRadius() { return radius; }
+    float getMass() { return radius; } //Mass linear with radius
 }
 
 /**
  * Moving balls that collide with circles
  */
 class Ball extends Circle {
-    float vx, vy;
+
     public Ball(float width, float height, int ballNum) {
-        x = (float)(random() * (width - 50)) + 25;
-        y = (float)(random() * (height - 50)) + 25;
+        x = (float)(random() * (width - 100)) + 25;
+        y = (float)(random() * (height - 100)) + 25;
 
         vx = (float) (random() * 5 + 0.1);
         if(random() < .5) {
@@ -531,5 +552,6 @@ class Ball extends Circle {
     float updateY() {
         return y += vy;
     }
+
  }
 
