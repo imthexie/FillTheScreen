@@ -2,19 +2,27 @@ package com.michaelxie.fillthescreen;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Bundle;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 
+import com.google.android.gms.analytics.HitBuilders;
+import com.google.android.gms.analytics.Tracker;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.concurrent.Semaphore;
@@ -24,6 +32,7 @@ import static java.lang.Math.*;
 public class GameScreen extends Activity {
 
     GameSurface gameSurface;
+	private Sounds soundsModule;
 
     /** Called when the activity is first created. */
     @Override
@@ -33,6 +42,19 @@ public class GameScreen extends Activity {
         setContentView(gameSurface);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+		soundsModule = new Sounds(getApplicationContext());
+
+		//Upload screen view to Google Analytics
+		// Get tracker.
+		Tracker t = ((FillTheScreen)getApplication()).getTracker(TrackerName.APP_TRACKER);
+
+		// Set screen name.
+		// Where path is a String representing the screen name.
+		t.setScreenName("GameScreen onCreate");
+
+		// Send a screen view.
+		t.send(new HitBuilders.AppViewBuilder().build());
     }
 
     @Override
@@ -58,6 +80,7 @@ public class GameScreen extends Activity {
 
         ArrayList<Ball> balls;
         Bitmap background;
+        boolean gameOver;
 
         volatile boolean running = false;
 
@@ -66,10 +89,7 @@ public class GameScreen extends Activity {
 
         private void initialize(Context context) {
             areaFilled = 0;
-
-            /* Initialize the balls */
-            balls = new ArrayList<Ball>();
-
+			gameOver = false;
 
             circles = new ArrayList<Circle>();
             activeCircles = new ArrayList<Circle>();
@@ -101,42 +121,48 @@ public class GameScreen extends Activity {
         }
 
         public void addCircle(Circle c) {
-            try{
-                arrayLock.acquire();
-            } catch(InterruptedException e) {
-                e.printStackTrace();
-            }
+            lockUI();
 
-            if(isTouching(c, circles, false) == -1) {
+            if(isTouching(c, circles, false, 0) == -1) {
                 activeCircles.add(c);
-            }
-            arrayLock.release();
+				if(EnterScreen.makeSounds)	soundsModule.startSlideSound();
+			}
+            unlockUI();
         }
 
         public void addBall(Ball b) {
             balls.add(b);
         }
 
-        public void initializeBalls(int numBalls) {
+        public void initializeBalls(int numBalls, int width, int height) {
             for(int i = 0; i < numBalls; i++) {
-                Ball b = new Ball(width, height, i);
+                Ball b = new Ball(width, height, getResources().getDisplayMetrics());
                 addBall(b);
             }
         }
 
-        boolean initialCreate = true;
+        int screenWidth, screenHeight;
+		DisplayMetrics displayMetrics;
+		private float textSize;
+
         @Override
         public void surfaceCreated(SurfaceHolder holder) {
             //Set up balls and get the canvas dimensions
             Canvas canvas = surfaceHolder.lockCanvas();
-            width = canvas.getWidth();
-            height = canvas.getHeight();
-            if(initialCreate) {
-                initializeBalls(2);
-                initialCreate = false;
-            }
-            totalArea = width * height;
-            background = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+            screenWidth = canvas.getWidth();
+            screenHeight = canvas.getHeight();
+
+			displayMetrics = getResources().getDisplayMetrics();
+			textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30, displayMetrics);
+
+			/* Initialize the balls */
+			if(balls == null) {
+				balls = new ArrayList<Ball>();
+				initializeBalls(EnterScreen.getNumBallsBasedOnScreen(), screenWidth, screenHeight);
+			}
+
+            totalArea = screenWidth * screenHeight;
+            background = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.RGB_565);
             canvas.setBitmap(background);
             surfaceHolder.unlockCanvasAndPost(canvas);
             onResumeGameSurface();
@@ -147,8 +173,6 @@ public class GameScreen extends Activity {
         public void surfaceDestroyed(SurfaceHolder holder) {
 
         }
-
-        int width, height;
 
         public void onResumeGameSurface(){
             running = true;
@@ -169,15 +193,42 @@ public class GameScreen extends Activity {
             }
         }
 
+
+		boolean firstTime = true;
         private void drawBackground(Canvas canvas) {
             canvas.drawColor(Color.parseColor("#0099cc"));
+			if(firstTime) {
+				String startHint = getResources().getString(R.string.start_hint);
+				float[] widths = new float[(startHint).length()];
+				contrastPaint.getTextWidths(startHint, 0, widths.length, widths);
+				float textWidth = 0;
+				for(int i = 0; i < widths.length; i++) {
+					textWidth += widths[i];
+				}
+				paint.setFakeBoldText(true);
+				paint.setTextSize(textSize);
+				canvas.drawText(startHint, screenWidth / 2 - textWidth / 2, screenHeight / 2, paint);
+			}
         }
 
         private float areaFilled;
         private float totalArea;
-        private String getAreaPercentage() {
-            return Math.min(100, Math.round(areaFilled / totalArea * 100)) + "%";
+
+        private int getAreaPercentage() {
+            return Math.min(100, Math.round(areaFilled / totalArea * 100));
         }
+
+		public float round(float value, int places) {
+			if (places < 0) throw new IllegalArgumentException();
+
+			BigDecimal bd = new BigDecimal(value);
+			bd = bd.setScale(places, RoundingMode.HALF_UP);
+			return bd.floatValue();
+		}
+
+		private String getPreciseAreaPercentageString() {
+			return Math.min(100, round(areaFilled / totalArea * 100 , 2)) + "";
+		}
 
         private float computeDistanceBetweenPoints(float x1, float y1, float x2, float y2) {
             return (float)sqrt((x2 - x1)*(x2 - x1) + (y2 - y1)*(y2 - y1));
@@ -190,30 +241,38 @@ public class GameScreen extends Activity {
         private double computeDistToSide(int sideIndex, double radius, float x, float y) {
             switch(sideIndex) {
                 case 0: return x;
-                case 1: return  width - x;
+                case 1: return  screenWidth - x;
                 case 2: return y;
-                case 3: return height - y;
+                case 3: return screenHeight - y;
             }
             return -1;
         }
 
-        private BitSet getSidesCrossed(Circle c) {
-            double radius = c.getRadius();
-            float x = c.getX();
-            float y = c.getY();
-            //Bit vector for 4 different corner conditions
-            BitSet sidesCrossed = new BitSet(4);
-            if(x - radius < 0) sidesCrossed.flip(0); //1000
-            if(x + radius > width) sidesCrossed.flip(1); //0100
-            if(y - radius < 0) sidesCrossed.flip(2); //0010
-            if(y + radius > height) sidesCrossed.flip(3); //0001
+		private BitSet getSidesCrossed(Circle c, boolean correction) {
+			float radius = c.getRadius();
+			float x = c.getX();
+			float y = c.getY();
+			//Bit vector for 4 different side conditions
+			BitSet sidesCrossed = new BitSet(4);
+			if(x - radius < 0) {
+				sidesCrossed.flip(0); //1000
+				if(correction) c.x = radius;
+			}
+			else if(x + radius > screenWidth) {
+				sidesCrossed.flip(1); //0100
+				if(correction) c.x = screenWidth - radius;
+			}
+			if(y - radius < 0) {
+				sidesCrossed.flip(2); //0010
+				if(correction) c.y = radius;
+			}
+			else if(y + radius > screenHeight) {
+				sidesCrossed.flip(3); //0001
+				if(correction) c.y = screenHeight - radius;
+			}
 
-            return sidesCrossed;
-        }
-
-        private float magnitudeFromLegs(float x, float y) {
-            return (float)Math.sqrt(x*x + y*y);
-        }
+			return sidesCrossed;
+		}
 
         private float legFromHypotenuse(double hypotenuse, double leg){
             return (float)Math.sqrt(hypotenuse * hypotenuse - leg * leg);
@@ -225,7 +284,7 @@ public class GameScreen extends Activity {
             float y = c.getY();
 
             //Bit vector for 4 different corner conditions
-            BitSet sidesCrossed = getSidesCrossed(c);
+            BitSet sidesCrossed = getSidesCrossed(c, false);
 
             //return (float)(radius * radius * Math.PI);
 
@@ -314,42 +373,18 @@ public class GameScreen extends Activity {
 
         }
 
-        private void incrementArea(ArrayList<Circle> circleArray) {
-            for(int i = 0; i < circleArray.size(); i++) {
-                float area = computeArea(circleArray.get(i));
-                //System.out.println(area);
+        private void incrementArea(Circle c) {
+                float area = computeArea(c);
                 areaFilled += area;
-            }
         }
 
 
         //Two different possible policies here - do I stop on border or not?
-        private int isTouching(Circle c, ArrayList<Circle> circleArray, boolean removeOnHit) {
-            /*double radius = c.getRadius();
-            float x = c.getX();
-            float y = c.getY();
-
-            //Bit vector for 4 different corner conditions
-            BitSet sidesCrossed = new BitSet(4);
-            if(x - radius < 0) sidesCrossed.flip(0); //1000
-            if(x + radius > width) sidesCrossed.flip(1); //0100
-            if(y - radius < 0) sidesCrossed.flip(2); //0010
-            if(y + radius > height) sidesCrossed.flip(3); //0001
-
-            float threshold = 10;
-            int sideIndex = 0;
-            boolean crossedSide = false;
-            while((sideIndex = sidesCrossed.nextSetBit(sideIndex++)) != -1 ) {
-                float distanceToSide = computeDistToSide(sideIndex, radius, x, y) -;
-                if (sideOverlap > 0 && sideOverlap < threshold) { //close to a side, let them reach the side
-                            return true;
-                } else if (sideOverlap < )
-
-            }*/
-
-            for(int i = 0; i < circleArray.size(); i++) {
+        private int isTouching(Circle c, ArrayList<Circle> circleArray, boolean removeOnHit, int startIndex) {
+            for(int i = startIndex; i < circleArray.size(); i++) {
                 float distance = computeDistance(c, circleArray.get(i));
                 if(distance <= (c.getRadius() + circleArray.get(i).getRadius())) {
+					if(EnterScreen.makeSounds)	soundsModule.startPopSound();
                     if(removeOnHit) circleArray.remove(i);
                     return i;
                 }
@@ -357,83 +392,92 @@ public class GameScreen extends Activity {
             return -1;
         }
 
-        private void drawCircles(Canvas canvas) {
 
-            for(int i = 0; i < activeCircles.size(); i++) {
-                Circle c = activeCircles.get(i);
-                if(isTouching(c, circles, false) == -1) {
+		private void updateCircleCollisions() {
+			ArrayList<Circle> toRemove = new ArrayList<Circle>();
+			for(Circle c : activeCircles) {
+				if(isTouching(c, circles, false, 0) != -1) {
+					toRemove.add(c);
+				}
+			}
+			for(Circle c : toRemove) {
+				activeCircles.remove(c);
+				circles.add(c);
+				incrementArea(c);
+			}
+		}
+        private void drawCircles(Canvas canvas) {
+            for(Circle c : activeCircles) {
                     canvas.drawCircle(c.getX(), c.getY(), c.getRadiusAndInc(), paint);
-                } else {
-                    incrementArea(activeCircles);
-                    circles.addAll(activeCircles);
-                    activeCircles.clear();
-                }
             }
             for(int i = 0; i < circles.size(); i++) {
                 Circle c = circles.get(i);
                 canvas.drawCircle(c.getX(), c.getY(), c.getRadius(), paint);
             }
-
-
-        }
-
-        private float angleBetweenVecs(float x1, float y1, float x2, float y2, float mag1, float mag2) {
-            return (float)Math.acos((x1 * x2 + y1 * y2) / (mag1 * mag2));
         }
 
         private void handleCircleBounce(Ball b, Circle c) {
-
-            //For option of moving the user's circles as well
-            //b.vx = (b.vx * (b.getMass() – c.getMass()) + (2 * c.getMass() * c.vx)) / (firstBall.mass + secondBall.mass);
-            //b.vy = (b.vy * (b.getMass() – c.getMass()) + (2 * c.getMass() * secondBall.speed.y)) / (firstBall.mass + secondBall.mass);
-
-
-
             //Calculate components of vector from the two circles' origins
-            float dx = c.getX() - b.getX();
-            float dy = c.getY() - b.getY();
+            float ax = c.getX() - b.getX();
+            float ay = c.getY() - b.getY();
 
-            float nn = dx * dx + dy * dy;
-            float vn = dx * b.vx + dy * b.vy;
+			//Velocity in same quadrant direction as ax, ay means that it's in the circle: allow the ball to make it out.
+			if(((ax > 0 && b.vx < 0) || (ax < 0 && b.vx > 0)) && ((ay < 0 && b.vy > 0) || (ay > 0 && b.vy < 0))) return;
+
+            float nn = ax * ax + ay * ay;
+            float vn = ax * b.vx + ay * b.vy;
 
             //if(vn > 0.0f) return; This commented code captures balls in a gravity field like manner
-            b.vx -= (2.0f * (vn/nn)) * dx;
-            b.vy -= (2.0f * (vn/nn)) * dy;
 
-    }
+			b.vx -= (2.0f * (vn/nn)) * ax;
+            b.vy -= (2.0f * (vn/nn)) * ay;
+
+    	}
+
+		private void updateBallCollisions() {
+			for(Ball b : balls) {
+				//bounce logic
+				BitSet sidesCrossed = getSidesCrossed(b, true);
+				//touching screen border, a circle, or active circle
+				if(sidesCrossed.cardinality() != 0) {
+					int index = -1;
+					while((index = sidesCrossed.nextSetBit(index + 1)) != -1) {
+						switch(index) {
+							case 0: b.vx *= -1; break;
+							case 1: b.vx *= -1; break;
+							case 2: b.vy *= -1; break;
+							case 3: b.vy *= -1; break;
+						}
+					}
+				}
+				if(isTouching(b, activeCircles, true, 0) != -1) {
+					//remove from active circles, ball hit a growing circle. Handled by isTouching
+					gameOver = true;
+					return;
+				} else {
+					int touchingCircleIndex = -1;
+					while((touchingCircleIndex = isTouching(b, circles, false, touchingCircleIndex + 1)) != -1){
+						//Add circle bounce code
+						handleCircleBounce(b, circles.get(touchingCircleIndex));
+					}
+				}
+			}
+		}
 
         private void drawBalls(Canvas canvas) {
-
             for(Ball b : balls) {
-                int touchingCircleIndex;
-                //bounce logic
-                BitSet sidesCrossed = getSidesCrossed(b);
-                //touching screen border, a circle, or active circle
-                if(sidesCrossed.cardinality() != 0) {
-                    int index = -1;
-                    while((index = sidesCrossed.nextSetBit(index + 1)) != -1) {
-                        switch(index) {
-                            case 0: b.vx *= -1; break;
-                            case 1: b.vx *= -1; break;
-                            case 2: b.vy *= -1; break;
-                            case 3: b.vy *= -1; break;
-                        }
-                    }
-                } else if(isTouching(b, activeCircles, true) != -1) {
-                    //remove from active circles, ball hit a growing circle. Handled by isTouching
-
-                } else if((touchingCircleIndex = isTouching(b, circles, false)) != -1) {
-                    //Add circle bounce code
-                    handleCircleBounce(b, circles.get(touchingCircleIndex));
-                }
                 canvas.drawCircle(b.updateX(), b.updateY(), b.getRadius(), contrastPaint);
             }
         }
 
         private void drawPercentage(Canvas canvas) {
-            String text = getAreaPercentage();
-            contrastPaint.setTextSize(30);
-            canvas.drawText(text, 50, 50, contrastPaint);
+            int percentage = getAreaPercentage();
+            String text = percentage + "%";
+            contrastPaint.setTextSize(textSize);
+            contrastPaint.setFakeBoldText(true);
+            float yWatermark = screenHeight - screenHeight * ((float)percentage / 100);
+            canvas.drawText(text, 50, (yWatermark + 50 >= screenHeight)? yWatermark - 50: yWatermark + 50, contrastPaint);
+            canvas.drawLine(0, yWatermark, screenWidth, yWatermark, contrastPaint);
         }
 
         private volatile boolean longPress = false;
@@ -443,9 +487,10 @@ public class GameScreen extends Activity {
             @Override
             public boolean onLongClick(View pView) {
                 //Only make new circles on long click
-                Circle c = new Circle(touchX, touchY, 75);
+                Circle c = new Circle(touchX, touchY, getResources().getDisplayMetrics());
                 addCircle(c); //Thread-safe method that also checks if in valid position to add new circle
                 longPress = true;
+				firstTime = false;
                 return true;
             }
         };
@@ -459,13 +504,12 @@ public class GameScreen extends Activity {
                 touchY = pEvent.getY();
                 // We're only interested in when the button is released.
                 if (pEvent.getAction() == MotionEvent.ACTION_UP) {
-                    // We're only interested in anything if our speak button is currently pressed.
-                    if (longPress) {
-                        incrementArea(activeCircles);
-
+                    if (longPress && activeCircles.size() > 0) {
+						lockUI();
+                        incrementArea(activeCircles.get(activeCircles.size()- 1));
                         circles.addAll(activeCircles);
                         activeCircles.clear();
-                        // Do something when the button is released.
+						unlockUI();
                         longPress = false;
                     }
                 }
@@ -475,83 +519,47 @@ public class GameScreen extends Activity {
 
         @Override
         public void run() {
-
             while(running){
                 if(surfaceHolder.getSurface().isValid()){
                     Canvas canvas = surfaceHolder.lockCanvas();
                     drawBackground(canvas);
-                    try{
-                        arrayLock.acquire();
-                    } catch(InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    drawCircles(canvas);
+                    lockUI();
+					updateCircleCollisions();
+					updateBallCollisions();
+					if(gameOver) {
+						if(EnterScreen.makeSounds) soundsModule.startGameOverSound();
+						Intent intent = new Intent(getContext(), ScoreScreen.class);
+						intent.putExtra("mode", "CLASSIC");
+						intent.putExtra("score", getPreciseAreaPercentageString());
+						startActivity(intent);
+						finish();
+					}
+					drawCircles(canvas);
                     drawBalls(canvas);
+
                     drawPercentage(canvas);
-                    arrayLock.release();
+                    unlockUI();
                     try{
-                        Thread.sleep(50);
+                        Thread.sleep(40);
                     } catch(InterruptedException e) {
                         break;
                     }
-
                     surfaceHolder.unlockCanvasAndPost(canvas);
                 }
             }
         }
 
+		private void lockUI() {
+			try{
+				arrayLock.acquire();
+			} catch(InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+		private void unlockUI() {
+			arrayLock.release();
+		}
     }
 }
 
-
-/**
- * Circles that fill the screen, generated by the user
- */
-class Circle {
-    float x;
-    float y;
-    float radius;
-    float vx, vy;
-    public Circle() {}
-    public Circle(float x, float y, float radius) {
-        this.x = x;
-        this.y = y;
-        this.radius = radius;
-        vx = 0;
-        vy = 0;
-    }
-    float getX() { return x; }
-    float getY() { return y; }
-    float getRadiusAndInc() { return radius += 1.0; } //Increment radius every time it is accessed, which means it's still active
-    float getRadius() { return radius; }
-    float getMass() { return radius; } //Mass linear with radius
-}
-
-/**
- * Moving balls that collide with circles
- */
-class Ball extends Circle {
-
-    public Ball(float width, float height, int ballNum) {
-        x = (float)(random() * (width - 100)) + 25;
-        y = (float)(random() * (height - 100)) + 25;
-
-        vx = (float) (random() * 5 + 0.1);
-        if(random() < .5) {
-            vx = -vx;
-        }
-        vy = 5;
-        if(random() < .5) {
-            vy = -vy;
-        }
-        radius = 40;
-    }
-    float updateX() {
-        return x += vx;
-    }
-    float updateY() {
-        return y += vy;
-    }
-
- }
 

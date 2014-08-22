@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources xmlns:tools="http://schemas.android.com/tools"
+                      tools:ignore="TypographyDashes">>
+    <integer name="ga_sessionTimeout">300</integer>
+
+    <!-- Enable automatic Activity measurement -->
+    <bool name="ga_autoActivityTracking">true</bool>
+
+    <!-- The screen names that will appear in reports -->
+    <screenName name="com.michaelxie.fillthescreen.EnterScreen">
+        FillTheScreen EnterScreen
+    </screenName>
+    <screenName name="com.michaelxie.fillthescreen.DynamicScreen">
+        FillTheScreen DynamicScreen
+    </screenName>
+    <screenName name="com.michaelxie.fillthescreen.GameScreen">
+        FillTheScreen ClassicScreen
+    </screenName>
+    <screenName name="com.michaelxie.fillthescreen.InfiniteScreen">
+        FillTheScreen InfiniteScreen
+    </screenName>
+    <screenName name="com.michaelxie.fillthescreen.SurvivalScreen">
+        FillTheScreen SurvivalScreen
+    </screenName>
+    <screenName name="com.michaelxie.fillthescreen.ScoreScreen">
+        FillTheScreen ScoreScreen
+    </screenName><screenName name="com.michaelxie.fillthescreen.HelpScreen">
+        FillTheScreen HelpScreen
+    </screenName>
+    <!--  The following value should be replaced with correct property id. -->
+    <string name="ga_trackingId">UA-55221060-1</string>
+</resources>

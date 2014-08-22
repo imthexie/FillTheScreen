@@ -2,7 +2,37 @@
 <resources>
 
     <string name="app_name">Fill The Screen</string>
-    <string name="dummy_button">Dummy Button</string>
-    <string name="dummy_content">DUMMY\nCONTENT</string>
+    <string name="your_score_message">Score:</string>
+    <string name="leaderboards_not_available">Leaderboards not available. \n Please sign in and try again.</string>
+    <string name="classic_desc">Don\'t get hit!</string>
+    <string name="infinite_desc">The goal is the enemy.</string>
+    <string name="survival_desc">Bigger is better.</string>
+    <string name="dynamic_desc">Those little devils.</string>
+    <string name="help_title">Help</string>
+    <string name="help_back">Back</string>
+    <string name="start_hint">Press and hold</string>
+    <string name="help_contents">
+        Classic Mode: \n\n
+        \t- Goal: Cover the highest percentage of the screen possible.\n
+        \t- Press and hold the screen to grow circles that fill the screen.\n
+        \t- If a growing circle is hit with a yellow ball, the game ends.\n
+        \t- Release your finger to stop growing the circle.\n
+        \t- Yellow balls will bounce off the circles that are not growing.\n\n
+        Infinite Mode: \n\n
+        \t- Goal: Score points and advance levels by filling the screen until you reach the goal mark.\n
+        \t- Reach the Goal mark to advance to the next level.\n\n
+        Survival Mode: \n\n
+        \t- Goal: Cover the highest percentage of the screen possible.\n
+        \t- Your circles will disappear when hit a certain number of times with the yellow balls.\n
+        \t- If your circles disappear, your percentage goes down.\n
+        \t- The highest score you achieved in the round is the recorded score.\n
+        \t- The red line indicates your highest score during that round.\n
+        \t- Larger balls live longer.\n\n
+        Dynamic Mode: \n\n
+        \t- Goal: Cover the highest percentage of the screen possible.\n
+        \t- Your circles move and the yellow balls are unpredictable. Can you handle it?\n
+        </string>
+    <string name="fb_app_id">1500936530153821</string>
+    <string name="banner_ad_unit_id">ca-app-pub-3329167849236973/3835668247</string>
 
 </resources>

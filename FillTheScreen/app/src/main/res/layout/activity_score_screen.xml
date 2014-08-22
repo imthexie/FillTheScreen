@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:tools="http://schemas.android.com/tools"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#0099cc"
+                xmlns:ads="http://schemas.android.com/apk/res-auto"
+                tools:context=".ScoreScreen">
+
+    <TextView
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:id="@+id/score"
+        android:gravity = "center_horizontal"
+        android:layout_centerVertical="true"
+        android:textSize ="100sp"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:id="@+id/your_score_is"
+        android:text = "@string/your_score_message"
+        android:textColor="#ffffffff"
+        android:layout_above="@+id/score"
+        android:layout_centerHorizontal="true"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:id="@+id/greeting"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:textColor="#ffffffff"/>
+
+        <ImageButton
+        android:layout_width="50dip"
+        android:layout_height="50dip"
+        android:background="#00000000"
+        android:scaleType="fitCenter"
+        android:adjustViewBounds="true"
+        android:id="@+id/leaderboard"
+        android:src="@drawable/games_leaderboards_white"
+        android:paddingLeft = "25dip"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"/>
+        <ImageButton
+            android:layout_width="50dip"
+            android:layout_height="50dip"
+            android:background="#00000000"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:id="@+id/play_again"
+            android:src="@drawable/ic_action_replay"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"/>
+        <ImageButton
+            android:layout_width="50dip"
+            android:layout_height="50dip"
+            android:background="#00000000"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:id="@+id/fb_post"
+            android:src="@drawable/fblogo__white_100"
+            android:paddingLeft = "25dip"
+            android:layout_above="@+id/leaderboard"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"/>
+        <ImageButton
+            android:layout_width="50dip"
+            android:layout_height="50dip"
+            android:background="#00000000"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:id="@+id/play_home"
+            android:src="@drawable/ic_action_play"
+            android:paddingRight = "25dip"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text=""
+        android:id="@+id/high_score"
+        android:layout_below="@+id/score"
+        android:layout_centerHorizontal="true"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text=""
+        android:id="@+id/mode_name"
+        android:layout_below="@+id/greeting"
+        android:layout_centerHorizontal="true"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Share!"
+        android:textColor="@color/yellow"
+        android:id="@+id/share_text"
+        android:paddingLeft = "12dip"
+        android:layout_above="@+id/fb_post"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"/>
+
+
+</RelativeLayout>
